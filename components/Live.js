@@ -2,6 +2,9 @@ import React, { Component } from 'react'
 import { View, Text, ActivityIndicator, TouchableOpacity, StyleSheet, Animated } from 'react-native'
 import { Foundation } from '@expo/vector-icons'
 import { purple, white } from '../utils/colors'
+import { Location, Permissions } from 'expo'
+import { calculateDirection } from '../utils/helpers'
+
 
 export default class Live extends Component {
   state = {
@@ -96,7 +99,7 @@ export default class Live extends Component {
     return (
       <View style={styles.container}>
         <View style={styles.directionContainer}>
-          <Text style={styles.header}>You're heading</Text>
+          <Text style={styles.header}>Youre heading</Text>
           <Animated.Text
             style={[styles.direction, {transform: [{scale: bounceValue}]}]}>
               {direction}
