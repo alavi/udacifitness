@@ -1,80 +1,111 @@
 import React, { Component } from 'react'
-import { View, Text, StyleSheet } from 'react-native'
+import { View, Text, StyleSheet, Platform, TouchableOpacity } from 'react-native'
 import { connect } from 'react-redux'
+import { receiveEntries, addEntry } from '../actions'
 import { timeToString, getDailyReminderValue } from '../utils/helpers'
+import { fetchCalendarResults } from '../utils/api'
+import UdaciFitnessCalendar from 'udacifitness-calendar'
+import { white } from '../utils/colors'
+import DateHeader from './DateHeader'
 import MetricCard from './MetricCard'
-import { white } from '../utils/helpers'
-import TextButton from './TextButton'
-import { addEntry } from '../actions'
-import { removeEntry } from '../utils/api'
+import { AppLoading} from 'expo'
 
-class EntryDetail extends Component {
-  static navigationOptions = ({ navigation }) => {
-    const { entryId } = navigation.state.params
-
-    const year = entryId.slice(0, 4)
-    const month = entryId.slice(5,7)
-    const day = entryId.slice(8)
-
-    return {
-      title: `${month}/${day}/${year}`
-    }
+class History extends Component {
+  state = {
+    ready: false,
   }
-  reset = () => {
-    const { remove, goBack, entryId } = this.props
+  componentDidMount () {
+    const { dispatch } = this.props
 
-    remove()
-    goBack()
-    removeEntry(entryId)
+    fetchCalendarResults()
+      .then((entries) => dispatch(receiveEntries(entries)))
+      .then(({ entries }) => {
+        if (!entries[timeToString()]) {
+          dispatch(addEntry({
+            [timeToString()]: getDailyReminderValue()
+          }))
+        }
+      })
+      .then(() => this.setState(() => ({ready: true})))
   }
-  shouldComponentUpdate (nextProps) {
-    return nextProps.metrics !== null && !nextProps.metrics.today
+  renderItem = ({ today, ...metrics }, formattedDate, key) => (
+    <View style={styles.item}>
+      {today
+        ? <View>
+            <DateHeader date={formattedDate}/>
+            <Text style={styles.noDataText}>
+              {today}
+            </Text>
+          </View>
+        : <TouchableOpacity
+            onPress={() => this.props.navigation.navigate(
+              'EntryDetail',
+              { entryId: key }
+            )}
+          >
+            <MetricCard date={formattedDate} metrics={metrics} />
+          </TouchableOpacity>}
+    </View>
+  )
+  renderEmptyDate(formattedDate) {
+    return (
+      <View style={styles.item}>
+        <DateHeader date={formattedDate}/>
+        <Text style={styles.noDataText}>
+          You didnt log any data on this day.
+        </Text>
+      </View>
+    )
   }
   render() {
-    const { metrics } = this.props
+    const { entries } = this.props
+    const { ready } = this.state
+
+    if (ready === false) {
+      return <AppLoading />
+    }
 
     return (
-      <View style={styles.container}>
-        <MetricCard metrics={metrics} />
-        <TextButton style={{margin: 20}} onPress={this.reset}>
-          RESET
-        </TextButton>
-      </View>
+      <UdaciFitnessCalendar
+        items={entries}
+        renderItem={this.renderItem}
+        renderEmptyDate={this.renderEmptyDate}
+      />
     )
   }
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  item: {
     backgroundColor: white,
-    padding: 15,
+    borderRadius: Platform.OS === 'ios' ? 16 : 2,
+    padding: 20,
+    marginLeft: 10,
+    marginRight: 10,
+    marginTop: 17,
+    justifyContent: 'center',
+    shadowRadius: 3,
+    shadowOpacity: 0.8,
+    shadowColor: 'rgba(0, 0, 0, 0.24)',
+    shadowOffset: {
+      width: 0,
+      height: 3
+    },
   },
+  noDataText: {
+    fontSize: 20,
+    paddingTop: 20,
+    paddingBottom: 20
+  }
 })
 
-function mapStateToProps (state, { navigation }) {
-  const { entryId } = navigation.state.params
 
+function mapStateToProps (entries) {
   return {
-    entryId,
-    metrics: state[entryId],
-  }
-}
-
-function mapDispatchToProps (dispatch, { navigation }) {
-  const { entryId } = navigation.state.params
-
-  return {
-    remove: () => dispatch(addEntry({
-      [entryId]: timeToString() === entryId
-        ? getDailyReminderValue()
-        : null
-    })),
-    goBack: () => navigation.goBack(),
+    entries
   }
 }
 
 export default connect(
   mapStateToProps,
-  mapDispatchToProps,
-)(EntryDetail)
+)(History)
